@@ -15,6 +15,19 @@ fn nothing(a: &str, b: i32, TestStruct{x: _, y: d, z: _}: TestStruct) -> f64
 	1.1
 }
 
+trait TestTrait
+{
+	fn test_method(&self, i: i32) -> f64;
+}
+
+impl TestTrait for TestStruct
+{
+	fn test_method(&self, i: _) -> _
+	{
+		1.1
+	}
+}
+
 fn main()
 {
 	nothing("a", 1, TestStruct{x: 10, y: 12, z: 14});

@@ -1,10 +1,9 @@
-use proc_macro2::{TokenStream, Span, Group, Delimiter};
-use syn::{ItemFn, Ident, Expr, Pat, FnArg, Type};
+use proc_macro2::{TokenStream, Span};
+use syn::{ItemFn, Ident, Expr, Pat, FnArg, Type, ReturnType};
 use syn::parse::{Parse, ParseStream};
 use syn;
 use quote::quote;
 use core::iter::Extend;
-use std::fmt;
 
 /// String table of error messages
 const ERROR_STRS: [&str; 1] =
@@ -12,6 +11,27 @@ const ERROR_STRS: [&str; 1] =
 	// Error message for when no tokens are given to parse in the `syn::parse()` method.
 	"expected function"
 ];
+
+/// Argument to a wrapped function.
+/// Contains the identifier (if one is given) and the type (if it can be determined).
+#[derive(Clone)]
+pub struct WrappedFnArg
+{
+	/// Identifier for the argument (None if a `_` is used).
+	pub ident: Option<Ident>,
+	/// Type of the argument (None if the type cannot be determined).
+	pub ty: Option<Type>
+}
+
+/// Contains the type variants that wrapped function can return.
+#[derive(Clone)]
+pub enum WrappedFnOutput
+{
+	/// No return type was given. Usually represented as `()`.
+	Default,
+	/// All other explicitly written types. Contains a `syn::Type` as the internal value.
+	Type(Type)
+}
 
 /// Function that can have code inserted before and after the rest of the function executes.
 /// Can be constructed with `syn::parse()` and other variations of parsing from the `syn`crate.
@@ -23,6 +43,8 @@ pub struct WrappedFn
 	// TODO: add args
 	/// `syn::ItemFn` that contains all of the data of the original function, including the code inside, the function signature, any attributes, etc.
 	pub function: ItemFn,
+	/// Return type.
+	pub output: WrappedFnOutput,
 	/// Identifier token for the variable that holds the return value of the wrapped function. Is almost always `result`.
 	pub result_ident: Ident,
 	/// `proc_macro2::TokenStream` that contains code that gets run after the rest of the function.
@@ -57,12 +79,23 @@ impl Parse for WrappedFn
 		}
 		// Attempt to parse the input tokens as a function
 		let function: ItemFn = input.parse()?;
+		// Get an iterator through all of the arguments in the function.
+		let fn_args = function.sig.inputs.iter();
+		// Get the return type
+		let output = match function.sig.output.clone()
+		{
+			// If a return type was explicitly given, extract it
+			ReturnType::Type(_, o) => WrappedFnOutput::Type(*o),
+			// If no return type was given, use the default return type variant (usually represented as ())
+			ReturnType::Default => WrappedFnOutput::Default
+		};
 		// Construct a WrappedFn to return
 		let wrapped_function = Self
 		{
 			pre_code: None,
 			function: function,
 			result_ident: Ident::new("result", Span::call_site()),
+			output: output,
 			post_code: None
 		};
 		Ok(wrapped_function)
