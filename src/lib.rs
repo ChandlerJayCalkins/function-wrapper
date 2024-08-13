@@ -12,20 +12,9 @@ const ERROR_STRS: [&str; 1] =
 	"expected function"
 ];
 
-/// Whether or not something is a reference and whether or not it is a mutable reference.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ReferenceType
-{
-	/// Not a reference.
-	NoRef,
-	/// Non-mutable reference (&).
-	Reference,
-	/// Mutable reference (& mut).
-	MutableReference
-}
-
 /// Argument to a wrapped function.
-/// Contains the identifier (if one is given) and the type (if it can be determined).
+/// Contains the identifier (if one is given), the type (if it can be determined),
+/// whether or not the argument is a reference, and whether or not it's mutable.
 #[derive(Clone)]
 pub struct WrappedFnArg<'a>
 {
@@ -33,61 +22,115 @@ pub struct WrappedFnArg<'a>
 	pub ident: Option<&'a PatIdent>,
 	/// Type of the argument (None if the type cannot be determined).
 	pub ty: Option<&'a Type>,
-	/// Whether or not the arg is a reference and whether or not it's a mutable reference.
-	pub reference: ReferenceType
+	/// Whether or not the argument is a reference.
+	pub reference: bool,
+	/// Whether or not the argument is mutable.
+	pub mutable: bool,
+	/// Any subpatterns the argument might have.
+	pub subpattern: Option<Pat>
 }
 
-fn collect_args<'a>(args: &mut Vec<WrappedFnArg<'a>>, pat: &'a Pat, ty: &'a Type, mut reference: ReferenceType)
+/// Traverses an argument to a function recursively to find each identifier and the type of that identifier in it.
+/// Identifiers that around found are placed in the args vec with their type in the form of a WrappedFnArg object.
+fn collect_args<'a>(args: &mut Vec<WrappedFnArg<'a>>, pat: &'a Pat, ty: &'a Type, mut reference: bool, mut mutable: bool)
+{
+	(reference, mutable) = check_ref_mut(ty, &reference, &mutable);
+	// Determine what kind of pattern the left side of the argument is
+	match pat
+	{
+		// Const block
+		Pat::Const(_) => (),
+		// Identifier
+		Pat::Ident(ident) => parse_ident(args, ident, ty, reference, mutable),
+		// Literal value, like a number or a string literal (1, "hello", 5.33, etc.)
+		Pat::Lit(_) => (),
+		// Macro invocation
+		Pat::Macro(_) => (),
+		// Or statement with 2 matchable patterns
+		Pat::Or(_) => (),
+		// A pattern within parentheses
+		Pat::Paren(_) => (),
+		// A scope path like `lib::mod::Thing`
+		Pat::Path(_) => (),
+		// A range pattern like `1..10` or `3..=9`
+		Pat::Range(_) => (),
+		// A pattern in a reference (like `&var` or `&mut var`)
+		Pat::Reference(_) => (),
+		// Double dots to skip something(s) (like `Struct { x, y, .. }`)
+		Pat::Rest(_) => (),
+		// A pattern inside a slice
+		Pat::Slice(_) => (),
+		// A struct with more patterns inside
+		Pat::Struct(_) => (),
+		// A tuple containing patterns
+		Pat::Tuple(_) => (),
+		// A tuple struct with more patterns inside
+		Pat::TupleStruct(_) => (),
+		// A variable binding to a type (like `foo: f64` or `bar: &str`)
+		Pat::Type(_) => (),
+		// A raw TokenStream of a pattern
+		Pat::Verbatim(_) => (),
+		// An underscore that matches anything
+		Pat::Wild(_) => (),
+		// All other patterns not yet implemented
+		_ => ()
+	}
+}
+
+/// Returns whether or not a given type is a reference and / or mutable.
+/// Returns the existing values if the type is not a reference.
+fn check_ref_mut(ty: &Type, reference: &bool, mutable: &bool) -> (bool, bool)
 {
 	match ty
 	{
+		// If the type is a reference
 		Type::Reference(r) =>
 		{
-			match reference
+			match r.mutability
 			{
-				ReferenceType::NoRef =>
-				{
-					match r.mutability
-					{
-						Some(_) => reference = ReferenceType::MutableReference,
-						None => reference = ReferenceType::Reference
-					}
-				}
-				_ => ()
+				// If the reference is mutable
+				Some(_) => (true, true),
+				// If the reference is not mutable
+				None => (true, false)
 			}
 		},
-		_ => ()
+		// If the type is not a reference
+		_ => (*reference, *mutable)
 	}
-	match pat
+}
+
+/// Parses an identifier argument in a wrapped function.
+fn parse_ident<'a>(args: &mut Vec<WrappedFnArg<'a>>, ident: &'a PatIdent, ty: &'a Type, mut reference: bool, mut mutable: bool)
+{
+	// Last check to see if this argument is a reference
+	reference = match ident.by_ref
 	{
-		Pat::Const(_) => (),
-		Pat::Ident(ident) =>
-		{
-			let arg = WrappedFnArg
-			{
-				ident: Some(ident),
-				ty: Some(ty),
-				reference: reference
-			};
-			args.push(arg);
-		},
-		Pat::Lit(_) => (),
-		Pat::Macro(_) => (),
-		Pat::Or(_) => (),
-		Pat::Paren(_) => (),
-		Pat::Path(_) => (),
-		Pat::Range(_) => (),
-		Pat::Reference(_) => (),
-		Pat::Rest(_) => (),
-		Pat::Slice(_) => (),
-		Pat::Struct(_) => (),
-		Pat::Tuple(_) => (),
-		Pat::TupleStruct(_) => (),
-		Pat::Type(_) => (),
-		Pat::Verbatim(_) => (),
-		Pat::Wild(_) => (),
-		_ => ()
-	}
+		Some(_) => true,
+		None => reference
+	};
+	// Last check to see if this argument is mutable
+	mutable = match ident.mutability
+	{
+		Some(_) => true,
+		None => mutable
+	};
+	// Find out if this argument has a subpattern and collect it if it does
+	let subpattern = match ident.subpat.clone()
+	{
+		Some(p) => Some(*p.1),
+		None => None
+	};
+	// Construct a new WrappedFnArg object with the current identifier and type
+	let arg = WrappedFnArg
+	{
+		ident: Some(ident),
+		ty: Some(ty),
+		reference: reference,
+		mutable: mutable,
+		subpattern: subpattern
+	};
+	// Add it to the list of arguments
+	args.push(arg);
 }
 
 /// Contains the type variants that wrapped function can return.
