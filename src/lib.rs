@@ -1,5 +1,5 @@
 use proc_macro2::{TokenStream, Span};
-use syn::{ItemFn, Ident, Expr, Pat, FnArg, Type, ReturnType};
+use syn::{ItemFn, Ident, PatIdent, PatType, Pat, FnArg, Type, ReturnType};
 use syn::parse::{Parse, ParseStream};
 use syn;
 use quote::quote;
@@ -12,15 +12,82 @@ const ERROR_STRS: [&str; 1] =
 	"expected function"
 ];
 
+/// Whether or not something is a reference and whether or not it is a mutable reference.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ReferenceType
+{
+	/// Not a reference.
+	NoRef,
+	/// Non-mutable reference (&).
+	Reference,
+	/// Mutable reference (& mut).
+	MutableReference
+}
+
 /// Argument to a wrapped function.
 /// Contains the identifier (if one is given) and the type (if it can be determined).
 #[derive(Clone)]
-pub struct WrappedFnArg
+pub struct WrappedFnArg<'a>
 {
 	/// Identifier for the argument (None if a `_` is used).
-	pub ident: Option<Ident>,
+	pub ident: Option<&'a PatIdent>,
 	/// Type of the argument (None if the type cannot be determined).
-	pub ty: Option<Type>
+	pub ty: Option<&'a Type>,
+	/// Whether or not the arg is a reference and whether or not it's a mutable reference.
+	pub reference: ReferenceType
+}
+
+fn collect_args<'a>(args: &mut Vec<WrappedFnArg<'a>>, pat: &'a Pat, ty: &'a Type, mut reference: ReferenceType)
+{
+	match ty
+	{
+		Type::Reference(r) =>
+		{
+			match reference
+			{
+				ReferenceType::NoRef =>
+				{
+					match r.mutability
+					{
+						Some(_) => reference = ReferenceType::MutableReference,
+						None => reference = ReferenceType::Reference
+					}
+				}
+				_ => ()
+			}
+		},
+		_ => ()
+	}
+	match pat
+	{
+		Pat::Const(_) => (),
+		Pat::Ident(ident) =>
+		{
+			let arg = WrappedFnArg
+			{
+				ident: Some(ident),
+				ty: Some(ty),
+				reference: reference
+			};
+			args.push(arg);
+		},
+		Pat::Lit(_) => (),
+		Pat::Macro(_) => (),
+		Pat::Or(_) => (),
+		Pat::Paren(_) => (),
+		Pat::Path(_) => (),
+		Pat::Range(_) => (),
+		Pat::Reference(_) => (),
+		Pat::Rest(_) => (),
+		Pat::Slice(_) => (),
+		Pat::Struct(_) => (),
+		Pat::Tuple(_) => (),
+		Pat::TupleStruct(_) => (),
+		Pat::Type(_) => (),
+		Pat::Verbatim(_) => (),
+		Pat::Wild(_) => (),
+		_ => ()
+	}
 }
 
 /// Contains the type variants that wrapped function can return.
@@ -83,6 +150,7 @@ impl Parse for WrappedFn
 		let function: ItemFn = input.parse()?;
 		// Get an iterator through all of the arguments in the function.
 		let fn_args = function.sig.inputs.iter();
+		let mut args: Vec<WrappedFnArg> = Vec::new();
 		// Get the return type
 		let output = match function.sig.output.clone()
 		{
