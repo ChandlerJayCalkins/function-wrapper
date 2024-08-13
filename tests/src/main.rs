@@ -20,13 +20,13 @@ trait TestTrait
 	fn test_method(&self, i: i32) -> f64;
 }
 
-impl TestTrait for TestStruct
-{
-	fn test_method(&self, i: _) -> _
-	{
-		1.1
-	}
-}
+// impl TestTrait for TestStruct
+// {
+// 	fn test_method(&self, i: _) -> _
+// 	{
+// 		1.1
+// 	}
+// }
 
 fn main()
 {

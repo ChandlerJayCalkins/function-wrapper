@@ -45,6 +45,8 @@ pub struct WrappedFn
 	pub function: ItemFn,
 	/// Return type.
 	pub output: WrappedFnOutput,
+	/// Identifier token for the closure that wraps all of the original code from the wrapped function.
+	pub wrapper_ident: Ident,
 	/// Identifier token for the variable that holds the return value of the wrapped function. Is almost always `result`.
 	pub result_ident: Ident,
 	/// `proc_macro2::TokenStream` that contains code that gets run after the rest of the function.
@@ -94,6 +96,7 @@ impl Parse for WrappedFn
 		{
 			pre_code: None,
 			function: function,
+			wrapper_ident: Ident::new("wrapper", Span::call_site()),
 			result_ident: Ident::new("result", Span::call_site()),
 			output: output,
 			post_code: None
@@ -116,11 +119,15 @@ impl From<WrappedFn> for TokenStream
 			{
 				// Get the code code block from the function that was given
 				let wrapped_code = &function.function.block;
+				// Get the identifier token for the closure that wraps the function's original code
+				let wrapper_ident = &function.wrapper_ident;
+				// Get the identifier token for the variable that holds the result of running the function's original code
+				let result_ident = &function.result_ident;
 				// Wrap the code in a closure, get the result of running that closure, and turn all of it into a TokenStream
 				let wrapper_code = quote!
 				{
-					let mut wrapper = || #wrapped_code ;
-					let result = wrapper();
+					let mut #wrapper_ident = || #wrapped_code ;
+					let #result_ident = #wrapper_ident ();
 				};
 				// Get a TokenStream of the return line
 				let return_line = quote!{ return result; };
@@ -168,11 +175,15 @@ impl From<WrappedFn> for TokenStream
 			{
 				// Get the code code block from the function that was given
 				let wrapped_code = &function.function.block;
+				// Get the identifier token for the closure that wraps the function's original code
+				let wrapper_ident = &function.wrapper_ident;
+				// Get the identifier token for the variable that holds the result of running the function's original code
+				let result_ident = &function.result_ident;
 				// Wrap the code in a closure, get the result of running that closure, and turn all of it into a TokenStream
 				let wrapper_code = quote!
 				{
-					let mut wrapper = || #wrapped_code ;
-					let result = wrapper();
+					let mut #wrapper_ident = || #wrapped_code ;
+					let #result_ident = #wrapper_ident ();
 				};
 				// Get a TokenStream of the return line
 				let return_line = quote!{ return result; };
