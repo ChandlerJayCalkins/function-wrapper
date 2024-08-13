@@ -40,9 +40,9 @@ pub struct WrappedFn
 {
 	/// `proc_macro2::TokenStream` that contains code that gets run before the rest of the function.
 	pub pre_code: Option<TokenStream>,
-	// TODO: add args
 	/// `syn::ItemFn` that contains all of the data of the original function, including the code inside, the function signature, any attributes, etc.
 	pub function: ItemFn,
+	// TODO: add args
 	/// Return type.
 	pub output: WrappedFnOutput,
 	/// Identifier token for the closure that wraps all of the original code from the wrapped function.
