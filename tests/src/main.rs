@@ -9,9 +9,9 @@ struct TestStruct
 }
 
 #[test]
-fn nothing(a: &str, b: i32, TestStruct{x: _, y: d, z: _}: TestStruct) -> f64
+fn nothing(a: &str, b: i32, TestStruct{x: c, y: d, z: e}: TestStruct, (foo, bar, baz): (&str, u8, bool)) -> f64
 {
-	println!("{}: {}", a, b);
+	println!("a: {}, b: {}, c: {}, foo: {}, bar: {}, baz: {}", a, b, c, foo, bar, baz);
 	1.1
 }
 
@@ -20,15 +20,7 @@ trait TestTrait
 	fn test_method(&self, i: i32) -> f64;
 }
 
-// impl TestTrait for TestStruct
-// {
-// 	fn test_method(&self, i: _) -> _
-// 	{
-// 		1.1
-// 	}
-// }
-
 fn main()
 {
-	nothing("a", 1, TestStruct{x: 10, y: 12, z: 14});
+	nothing("a", 1, TestStruct{x: 10, y: 12, z: 14}, ("ahoy", 200, true));
 }
