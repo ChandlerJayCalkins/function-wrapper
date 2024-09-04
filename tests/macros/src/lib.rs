@@ -6,10 +6,14 @@ use quote::quote;
 
 // Attribute that tests adding code before and after the rest of a function
 #[proc_macro_attribute]
-pub fn test(_: proc_macro::TokenStream, item: proc_macro::TokenStream) -> proc_macro::TokenStream
+pub fn wrap_test(_: proc_macro::TokenStream, item: proc_macro::TokenStream) -> proc_macro::TokenStream
 {
 	let mut function = parse_macro_input!(item as WrappedFn);
-	let mut start_code = quote!{ println!("hi at the start"); };
+	let mut start_code = quote!
+	{
+		println!("########################################");
+		println!("hi at the start");
+	};
 	for arg in &function.function.sig.inputs
 	{
 		match arg
@@ -23,9 +27,12 @@ pub fn test(_: proc_macro::TokenStream, item: proc_macro::TokenStream) -> proc_m
 		}
 	}
 	function.set_pre_code(start_code);
+	let result_ident = &function.result_ident;
 	function.set_post_code(quote!
 	{
+		println!("return value: {:?}", #result_ident);
 		println!("hi at the end");
+		println!("########################################");
 	});
 	let ts = proc_macro2::TokenStream::from(function);
 	println!("{}", ts.clone());

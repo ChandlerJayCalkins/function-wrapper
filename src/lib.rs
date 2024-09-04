@@ -1,5 +1,5 @@
 use proc_macro2::{TokenStream, Span};
-use syn::{ItemFn, Ident, Type, ReturnType};
+use syn::{ItemFn, Ident, /* Type, ReturnType */};
 use syn::parse::{Parse, ParseStream};
 use syn;
 use quote::quote;
