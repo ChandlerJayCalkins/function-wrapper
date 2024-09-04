@@ -13,7 +13,7 @@ fn hello() -> bool
 }
 ```
 
-which is being wrapped by this attribute that adds a print statement before and after the function using the `WrappedFn` struct from this crate
+which is being wrapped by this attribute
 
 ```rs
 use function_wrapper::WrappedFn;
@@ -25,7 +25,7 @@ use quote::quote;
 #[proc_macro_attribute]
 pub fn wrap_test(_: proc_macro::TokenStream, item: proc_macro::TokenStream) -> proc_macro::TokenStream
 {
-	// Parse input as a WrappedFn object.
+	// Parse input as a WrappedFn object from the function-wrapper crate.
 	let mut function = parse_macro_input!(item as WrappedFn);
 	// Put a print statement in the code that gets run before the function.
 	function.set_pre_code(quote!{ println!("Hi at the start :)"); });
