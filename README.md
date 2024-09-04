@@ -24,7 +24,7 @@ use quote::quote;
 
 // Adds print statements before and after a function executes.
 #[proc_macro_attribute]
-pub fn wrap_test(_: proc_macro::TokenStream, item: proc_macro::TokenStream) -> proc_macro::TokenStream
+pub fn wrap(_: proc_macro::TokenStream, item: proc_macro::TokenStream) -> proc_macro::TokenStream
 {
 	// Parse input as a WrappedFn object from the function-wrapper crate.
 	let mut function = parse_macro_input!(item as WrappedFn);

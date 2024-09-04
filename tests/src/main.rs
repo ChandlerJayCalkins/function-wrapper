@@ -1,4 +1,4 @@
-use macros::wrap_test;
+use macros::{wrap_test, wrap};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 struct TestStruct
