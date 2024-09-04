@@ -13,7 +13,7 @@ fn hello() -> bool
 }
 ```
 
-which is being wrapped by this attribute that adds a print statement before and after the function
+which is being wrapped by this attribute that adds a print statement before and after the function using the `WrappedFn` struct from this crate
 
 ```rs
 use function_wrapper::WrappedFn;
