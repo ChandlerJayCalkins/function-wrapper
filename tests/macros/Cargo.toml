@@ -11,5 +11,5 @@ proc-macro = true
 [dependencies]
 function-wrapper = { path = "../.." }
 proc-macro2 = { version = "1.0.86" }
-syn = { version = "2.0.75", features = ["full"] }
+syn = { version = "2.0.77", features = ["full"] }
 quote = { version = "1.0.36" }

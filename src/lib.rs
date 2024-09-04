@@ -23,7 +23,7 @@ const ERROR_STRS: [&str; 1] =
 // }
 
 /// Function that can have code inserted before and after the rest of the function executes.
-/// Can be constructed with `syn::parse()` and other variations of parsing from the `syn`crate.
+/// Can be constructed with `syn::parse()` and other variations of parsing from the `syn` crate.
 #[derive(Clone)]
 pub struct WrappedFn
 {

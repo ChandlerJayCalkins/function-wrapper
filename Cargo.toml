@@ -1,11 +1,14 @@
 [package]
 name = "function-wrapper"
 version = "0.1.0"
+authors = ["Chandler Calkins <chandlerjaycalkins@gmail.com>"]
 edition = "2021"
+description = "Rust attribute macro library that makes it easy to wrap functions in code that runs before and / or after a function executes."
+license = "MIT OR Apache-2.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 proc-macro2 = { version = "1.0.86" }
-syn = { version = "2.0.75", features = ["full"] }
+syn = { version = "2.0.77", features = ["full"] }
 quote = { version = "1.0.36" }

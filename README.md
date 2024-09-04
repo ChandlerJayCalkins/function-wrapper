@@ -1,2 +1,2 @@
 # function-wrapper
- Rust library crate that helps create procedural attribute macros to wrap functions in code that executes before and after the function runs.
+ Rust attribute macro library that makes it easy to wrap functions in code that runs before and / or after a function executes.
