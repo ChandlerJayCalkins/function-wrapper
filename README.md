@@ -22,7 +22,7 @@ extern crate proc_macro2;
 use syn::parse_macro_input;
 use quote::quote;
 
-// Adds a print statements before and after a function executes.
+// Adds print statements before and after a function executes.
 #[proc_macro_attribute]
 pub fn wrap_test(_: proc_macro::TokenStream, item: proc_macro::TokenStream) -> proc_macro::TokenStream
 {
