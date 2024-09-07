@@ -3,7 +3,7 @@ Rust attribute macro library that makes it easy to wrap functions in code that r
 
 This function
 
-```rs
+```rust
 #[wrap]
 fn hello() -> bool
 {
@@ -15,7 +15,7 @@ fn hello() -> bool
 
 which is being wrapped by this attribute
 
-```rs
+```rust
 use function_wrapper::WrappedFn;
 extern crate proc_macro;
 extern crate proc_macro2;
@@ -39,7 +39,7 @@ pub fn wrap(_: proc_macro::TokenStream, item: proc_macro::TokenStream) -> proc_m
 
 will turn into this after being compiled.
 
-```rs
+```rust
 fn hello() -> bool
 {
 	println!("Hi at the start :)");
@@ -54,3 +54,6 @@ fn hello() -> bool
 	result
 }
 ```
+
+If only pre-code is added, a wrapper closure and extra return expression won't be added since they are unecessary in this case.
+If only post-code is added, the wrapper closure and return expression will still need to be added.

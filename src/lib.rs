@@ -4,7 +4,7 @@
 //!
 //! This function
 //!
-//! ```rs
+//! ```rust
 //! #[wrap]
 //! fn hello() -> bool
 //! {
@@ -16,7 +16,7 @@
 //!
 //! which is being wrapped by this attribute
 //!
-//! ```rs
+//! ```rust
 //! use function_wrapper::WrappedFn;
 //! extern crate proc_macro;
 //! extern crate proc_macro2;
@@ -40,7 +40,7 @@
 //!
 //! will turn into this after being compiled.
 //!
-//! ```rs
+//! ```rust
 //! fn hello() -> bool
 //! {
 //! 	println!("Hi at the start :)");
@@ -55,6 +55,10 @@
 //! 	result
 //! }
 //! ```
+//!
+//! If only pre-code is added, a wrapper closure and extra return expression won't be added since they are unecessary in this case.
+//! If only post-code is added, the wrapper closure and return expression will still be added out of necessity.
+//!
 
 use proc_macro2::{TokenStream, Span};
 use syn::{ItemFn, Ident, /* Type, ReturnType */};
@@ -85,7 +89,7 @@ const ERROR_STRS: [&str; 1] =
 ///
 /// Example:
 ///
-/// ```rs
+/// ```rust
 /// let mut function = parse_macro_input!(token_stream as WrappedFn);
 /// ```
 ///
@@ -93,7 +97,7 @@ const ERROR_STRS: [&str; 1] =
 ///
 /// Example:
 ///
-/// ```rs
+/// ```rust
 /// function.set_pre_code(quote!{ println!("Hi at the start :)"); });
 /// ```
 ///
@@ -101,7 +105,7 @@ const ERROR_STRS: [&str; 1] =
 ///
 /// Example:
 ///
-/// ```rs
+/// ```rust
 /// function.set_post_code(quote!{ println!("Hi at the end :)"); });
 /// ```
 #[derive(Clone)]
@@ -136,12 +140,24 @@ impl WrappedFn
 	{
 		self.post_code = Some(post_code);
 	}
+
+	/// Changes the identifier for the closure that wraps the code of the original function (it is `wrapper` by default).
+	pub fn set_wrapper_ident(&mut self, ident: &str)
+	{
+		self.wrapper_ident = Ident::new(ident, Span::call_site());
+	}
+
+	/// Changes the identifier for the variable that holds the value that the function returns (it is `result` by default).
+	pub fn set_result_ident(&mut self, ident: &str)
+	{
+		self.result_ident = Ident::new(ident, Span::call_site());
+	}
 }
 
 /// Main way to construct a `WrappedFn`.
 /// Can be constructed using `syn::parse_macro_input` like this:
 ///
-/// ```rs
+/// ```rust
 /// let mut function = parse_macro_input!(token_stream as WrappedFn);
 /// ```
 impl Parse for WrappedFn
