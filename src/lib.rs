@@ -108,7 +108,7 @@ const ERROR_STRS: [&str; 1] =
 /// ```rust
 /// function.set_post_code(quote!{ println!("Hi at the end :)"); });
 /// ```
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct WrappedFn
 {
 	/// Contains code that gets run before the rest of the function.
