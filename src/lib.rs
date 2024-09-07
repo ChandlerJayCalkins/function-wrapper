@@ -141,6 +141,18 @@ impl WrappedFn
 		self.post_code = Some(post_code);
 	}
 
+	/// Removes any code that was going to be added before the rest of the function.
+	pub fn remove_pre_code(&mut self)
+	{
+		self.pre_code = None
+	}
+
+	/// Removes any code that was going to be added after the rest of the function.
+	pub fn remove_post_code(&mut self)
+	{
+		self.post_code = None
+	}
+
 	/// Changes the identifier for the closure that wraps the code of the original function (it is `wrapper` by default).
 	pub fn set_wrapper_ident(&mut self, ident: &str)
 	{
