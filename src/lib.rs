@@ -61,7 +61,7 @@
 //!
 
 use proc_macro2::{TokenStream, Span};
-use syn::{ItemFn, Ident, /* Type, ReturnType */};
+use syn::{ItemFn, Block, Ident, /* Type, ReturnType */};
 use syn::parse::{Parse, ParseStream};
 use syn;
 use quote::quote;
@@ -111,20 +111,20 @@ const ERROR_STRS: [&str; 1] =
 #[derive(Clone, Debug)]
 pub struct WrappedFn
 {
-	/// Contains code that gets run before the rest of the function.
-	pub pre_code: Option<TokenStream>,
 	/// `syn::ItemFn` that contains all of the data of the original function, including the code inside, the function signature, any attributes, etc.
 	pub function: ItemFn,
+	/// Contains code that gets run before the rest of the function.
+	pub pre_code: Option<TokenStream>,
+	/// Contains code that gets run after the rest of the function.
+	pub post_code: Option<TokenStream>,
 	// /// The arguments to the function.
 	// pub args: Vec<FnArgData>,
 	// /// Return type.
 	// pub output: WrappedFnOutput,
-	/// Identifier token for the closure that wraps all of the original code from the wrapped function. It is `wrapper` by default.
+	/// Identifier token for the closure that wraps all of the original code from the wrapped function. `wrapper` by default.
 	pub wrapper_ident: Ident,
-	/// Identifier token for the variable that holds the return value of the wrapped function. It is `result` by default.
-	pub result_ident: Ident,
-	/// Contains code that gets run after the rest of the function.
-	pub post_code: Option<TokenStream>
+	/// Identifier token for the variable that holds the return value of the wrapped function. `result` by default.
+	pub result_ident: Ident
 }
 
 impl WrappedFn
@@ -144,25 +144,88 @@ impl WrappedFn
 	/// Removes any code that was going to be added before the rest of the function.
 	pub fn remove_pre_code(&mut self)
 	{
-		self.pre_code = None
+		self.pre_code = None;
 	}
 
 	/// Removes any code that was going to be added after the rest of the function.
 	pub fn remove_post_code(&mut self)
 	{
-		self.post_code = None
+		self.post_code = None;
 	}
 
-	/// Changes the identifier for the closure that wraps the code of the original function (it is `wrapper` by default).
+	/// Changes the identifier for the closure that wraps the code of the original function (`wrapper` by default).
 	pub fn set_wrapper_ident(&mut self, ident: &str)
 	{
 		self.wrapper_ident = Ident::new(ident, Span::call_site());
 	}
 
-	/// Changes the identifier for the variable that holds the value that the function returns (it is `result` by default).
+	/// Changes the identifier for the variable that holds the value that the function returns (`result` by default).
 	pub fn set_result_ident(&mut self, ident: &str)
 	{
 		self.result_ident = Ident::new(ident, Span::call_site());
+	}
+
+	/// Inserts the unwrapped original code from a function into a function block.
+	///
+	/// Inputs:
+	/// 
+	/// `function_block`: The block of code that goes inside the function where the original code is re-added.
+	///
+	/// `og_code`: The original code from the function.
+	fn add_unwrapped_code(function_block: &mut TokenStream, og_code: &Block)
+	{
+		// Convert the function's old code block into a TokenStream and add it after the pre code
+		function_block.extend(quote!{ #og_code });
+	}
+
+	/// Wraps the original code of a function in a closure and inserts code after it inside a function block.
+	///
+	/// Inputs:
+	///
+	/// `og_code`: The original code of the function that comes before the post code.
+	///
+	/// `wrapper_ident`: Identifier token for the closure that wraps all of the original code from the wrapped function.
+	///
+	/// `result_ident`: Identifier token for the variable that holds the return value of the wrapped function.
+	///
+	/// `function_block`: The block of code that goes inside the function where the wrapper code and post code is added.
+	///
+	/// `post_code`: The code to be inserted that runs at the end of the function.
+	fn add_wrapped_post_code(og_code: &Block, wrapper_ident: &Ident, result_ident: &Ident, function_block: &mut TokenStream, post_code: TokenStream)
+	{
+		// Wrap the code in a closure, get the result of running that closure, and turn all of it into a TokenStream
+		let wrapper_code = quote!
+		{
+			let mut #wrapper_ident = || #og_code ;
+			let #result_ident = #wrapper_ident ();
+		};
+		// Get a TokenStream of the return line
+		let return_line = quote!{ #result_ident };
+		// Add the wrapped code that came with the function
+		function_block.extend(wrapper_code);
+		// Add the code that runs after the rest of the function
+		function_block.extend(post_code);
+		// Add the line that returns the return value
+		function_block.extend(return_line);
+	}
+
+	/// Gets a `proc_macro2::TokenStream` of a function that just had code inserted into it.
+	///
+	/// Inputs:
+	///
+	/// `function`: The original function that is being wrapped.
+	///
+	/// `function_block`: The new block of code that is replacing the old one inside the function that is being wrapped.
+	///
+	/// Outputs: A `proc_macro2::TokenStream` of the newly wrapped function.
+	fn get_function(mut function: ItemFn, function_block: &TokenStream) -> TokenStream
+	{
+		// Wrap all of this code inside curly braces
+		let function_block = quote!{ { #function_block } };
+		// Set the code inside the function to the new code
+		function.block = syn::parse(function_block.into()).unwrap();
+		// Convert the function back to a TokenStream and return it
+		quote!(#function)
 	}
 }
 
@@ -195,18 +258,18 @@ impl Parse for WrappedFn
 		// Construct a WrappedFn to return
 		let wrapped_function = Self
 		{
-			pre_code: None,
 			function: function,
+			pre_code: None,
+			post_code: None,
 			// output: output,
 			wrapper_ident: Ident::new("wrapper", Span::call_site()),
-			result_ident: Ident::new("result", Span::call_site()),
-			post_code: None
+			result_ident: Ident::new("result", Span::call_site())
 		};
 		Ok(wrapped_function)
 	}
 }
 
-/// Allows `WrappedFn`s to be converted into tokenstreams for easy use in procedural attribute macros.
+/// Allows `WrappedFn`s to be converted into `proc_macro2::TokenStream`s for easy use in procedural attribute macros.
 impl From<WrappedFn> for TokenStream
 {
 	/// Converts a `WrappedFn` into a `proc_macro2::TokenStream`.
@@ -218,92 +281,34 @@ impl From<WrappedFn> for TokenStream
 			// If the function has some code to get run both before and after the function
 			(Some(pre_code), Some(post_code)) =>
 			{
-				// Get the code code block from the function that was given
-				let wrapped_code = &function.function.block;
-				// Get the identifier token for the closure that wraps the function's original code
-				let wrapper_ident = &function.wrapper_ident;
-				// Get the identifier token for the variable that holds the result of running the function's original code
-				let result_ident = &function.result_ident;
-				// Wrap the code in a closure, get the result of running that closure, and turn all of it into a TokenStream
-				let wrapper_code = quote!
-				{
-					let mut #wrapper_ident = || #wrapped_code ;
-					let #result_ident = #wrapper_ident ();
-				};
-				// Get a TokenStream of the return line
-				let return_line = quote!{ #result_ident };
-				// Create a TokenStream where everything will get combined, starting with the code that gets run before the rest of the function
+				// Create a new block of code that will replace the old one in the function and start it with the pre code
 				let mut function_block = pre_code;
-				// Add the wrapped code that came with the function
-				function_block.extend(wrapper_code);
-				// Add the code that runs after the rest of the function
-				function_block.extend(post_code);
-				// Add the line that returns the return value
-				function_block.extend(return_line);
-				// Wrap all of this code inside curly braces
-				let function_block = quote!{ { #function_block } };
-				// Get a new ItemFn object
-				let mut function = function.function.clone();
-				// Set the code inside the function to the new code
-				function.block = syn::parse(function_block.into()).unwrap();
-				// Convert the function back to a TokenStream and return it
-				quote!(#function)
+				// Wrap and add the original function code and add the post code to the new function block
+				WrappedFn::add_wrapped_post_code(&function.function.block, &function.wrapper_ident, &function.result_ident, &mut function_block, post_code);
+				// Replaces the function's code block with the new one and converts the entire function into a TokenStream to return it
+				WrappedFn::get_function(function.function, &function_block)
 			},
 			// If the function has some code to get run before the function but not after
 			(Some(pre_code), None) =>
 			{
-				// Get the code code block from the function that was given
-				let code = &function.function.block;
-				// Turn it into a TokenStream
-				let code = quote! { #code };
-				// Create a TokenStream where everything will get combined, starting with the code that gets run before the rest of the function
-				let mut function_block = TokenStream::new();
-				// Add the code that gets run before the rest of the function
-				function_block.extend(pre_code);
-				// Add the code that came with the function
-				function_block.extend(code);
-				// Wrap all of this code inside curly braces
-				let function_block = quote!{ { #function_block } };
-				// Get a new ItemFn object
-				let mut function = function.function.clone();
-				// Set the code inside the function to the new code
-				function.block = syn::parse(function_block.into()).unwrap();
-				// Convert the function back to a TokenStream and return it
-				quote!(#function)
+				// Create a new block of code that will replace the old one in the function and start it with the pre code
+				let mut function_block = pre_code;
+				// Add the function's original code after the pre code
+				WrappedFn::add_unwrapped_code(&mut function_block, &function.function.block);
+				// Replaces the function's code block with the new one and converts the entire function into a TokenStream to return it
+				WrappedFn::get_function(function.function, &function_block)
 			},
 			// If the function has some code to get run after the function but not before
 			(None, Some(post_code)) =>
 			{
-				// Get the code code block from the function that was given
-				let wrapped_code = &function.function.block;
-				// Get the identifier token for the closure that wraps the function's original code
-				let wrapper_ident = &function.wrapper_ident;
-				// Get the identifier token for the variable that holds the result of running the function's original code
-				let result_ident = &function.result_ident;
-				// Wrap the code in a closure, get the result of running that closure, and turn all of it into a TokenStream
-				let wrapper_code = quote!
-				{
-					let mut #wrapper_ident = || #wrapped_code ;
-					let #result_ident = #wrapper_ident ();
-				};
-				// Get a TokenStream of the return line
-				let return_line = quote!{ #result_ident };
-				// Create a TokenStream where everything will get combined, starting with the wrapped code that came with the function
-				let mut function_block = wrapper_code;
-				// Add the code that runs after the rest of the function
-				function_block.extend(post_code);
-				// Add the line that returns the return value
-				function_block.extend(return_line);
-				// Wrap all of this code inside curly braces
-				let function_block = quote!{ { #function_block } };
-				// Get a new ItemFn object
-				let mut function = function.function.clone();
-				// Set the code inside the function to the new code
-				function.block = syn::parse(function_block.into()).unwrap();
-				// Convert the function back to a TokenStream and return it
-				quote!(#function)
+				// Create a new block of code that will replace the old one in the function
+				let mut function_block = TokenStream::new();
+				// Wrap and add the original function code and add the post code to the new function block
+				WrappedFn::add_wrapped_post_code(&function.function.block, &function.wrapper_ident, &function.result_ident, &mut function_block, post_code);
+				// Replaces the function's code block with the new one and converts the entire function into a TokenStream to return it
+				WrappedFn::get_function(function.function, &function_block)
 			},
-			// If the function has no code to insert before or after the function
+			// If the function has no code to insert anywhere
 			(None, None) =>
 			{
 				// Just return the function the way it is as a TokenStream

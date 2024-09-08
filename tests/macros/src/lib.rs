@@ -4,9 +4,23 @@ extern crate proc_macro2;
 use syn::{parse_macro_input, FnArg};
 use quote::quote;
 
-// Attribute that tests adding code before and after the rest of a function.
+/// Adds print statements before and after a function executes.
 #[proc_macro_attribute]
-pub fn wrap_test(_: proc_macro::TokenStream, item: proc_macro::TokenStream) -> proc_macro::TokenStream
+pub fn example_wrapper(_: proc_macro::TokenStream, item: proc_macro::TokenStream) -> proc_macro::TokenStream
+{
+	// Parse input as a WrappedFn object from the function-wrapper crate.
+	let mut function = parse_macro_input!(item as WrappedFn);
+	// Put a print statement in the code that gets run before the function.
+	function.set_pre_code(quote!{ println!("Hi at the start :)"); });
+	// Put a print statement in the code that gets run after the function.
+	function.set_post_code(quote!{ println!("Hi at the end :)"); });
+	// Convert the function into a TokenStream and return it.
+	proc_macro2::TokenStream::from(function).into()
+}
+
+/// Attribute that tests adding code before and after the rest of a function and debug prints all parameters.
+#[proc_macro_attribute]
+pub fn access_parameters_attr(_: proc_macro::TokenStream, item: proc_macro::TokenStream) -> proc_macro::TokenStream
 {
 	// Parses the input as a WrappedFn so code can be added before and / or after the rest of the function executes.
 	let mut function = parse_macro_input!(item as WrappedFn);
@@ -48,21 +62,38 @@ pub fn wrap_test(_: proc_macro::TokenStream, item: proc_macro::TokenStream) -> p
 	ts.into()
 }
 
-// Adds print statements before and after a function executes.
+/// Adds print statements before and / or after a function executes, or adds nothing.
 #[proc_macro_attribute]
-pub fn wrap(_: proc_macro::TokenStream, item: proc_macro::TokenStream) -> proc_macro::TokenStream
+pub fn test_attr(parms: proc_macro::TokenStream, item: proc_macro::TokenStream) -> proc_macro::TokenStream
 {
 	// Parse input as a WrappedFn object from the function-wrapper crate.
 	let mut function = parse_macro_input!(item as WrappedFn);
-	// Put a print statement in the code that gets run before the function.
-	function.set_pre_code(quote!{ println!("Hi at the start :)"); });
-	// Put a print statement in the code that gets run after the function.
-	function.set_post_code(quote!{ println!("Hi at the end :)"); });
+	match parms.to_string().to_lowercase().as_str()
+	{
+		"both" =>
+		{
+			// Put a print statement in the code that gets run before the function.
+			function.set_pre_code(quote!{ println!("Hi at the start :)"); });
+			// Put a print statement in the code that gets run after the function.
+			function.set_post_code(quote!{ println!("Hi at the end :)"); });
+		},
+		"pre" =>
+		{
+			// Put a print statement in the code that gets run before the function.
+			function.set_pre_code(quote!{ println!("Hi at the start :)"); });
+		},
+		"post" =>
+		{
+			// Put a print statement in the code that gets run after the function.
+			function.set_post_code(quote!{ println!("Hi at the end :)"); });
+		},
+		"" | "none" => (),
+		_ => panic!("Invalid attribute parameter.")
+	}
 	// Convert the function into a TokenStream and return it.
-	proc_macro2::TokenStream::from(function).into()
-	// let ts = proc_macro2::TokenStream::from(function);
-	// println!("{}", ts.clone());
-	// ts.into()
+	let ts = proc_macro2::TokenStream::from(function);
+	println!("{}", ts.clone());
+	ts.into()
 }
 
 #[cfg(test)]
