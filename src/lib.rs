@@ -64,7 +64,7 @@ use proc_macro2::{TokenStream, Span};
 use syn::{ItemFn, Block, Ident, /* Type, ReturnType */};
 use syn::parse::{Parse, ParseStream};
 use syn;
-use quote::quote;
+use quote::{quote, ToTokens};
 use core::iter::Extend;
 
 /// String table of error messages
@@ -191,7 +191,7 @@ impl WrappedFn
 	/// `function_block`: The block of code that goes inside the function where the wrapper code and post code is added.
 	///
 	/// `post_code`: The code to be inserted that runs at the end of the function.
-	fn add_wrapped_post_code(og_code: &Block, wrapper_ident: &Ident, result_ident: &Ident, function_block: &mut TokenStream, post_code: TokenStream)
+	fn add_wrapped_post_code(og_code: &Block, wrapper_ident: &Ident, result_ident: &Ident, function_block: &mut TokenStream, post_code: &TokenStream)
 	{
 		// Wrap the code in a closure, get the result of running that closure, and turn all of it into a TokenStream
 		let wrapper_code = quote!
@@ -204,12 +204,12 @@ impl WrappedFn
 		// Add the wrapped code that came with the function
 		function_block.extend(wrapper_code);
 		// Add the code that runs after the rest of the function
-		function_block.extend(post_code);
+		function_block.extend(post_code.clone());
 		// Add the line that returns the return value
 		function_block.extend(return_line);
 	}
 
-	/// Gets a `proc_macro2::TokenStream` of a function that just had code inserted into it.
+	/// Gets a `syn::ItemFn` of a function that just had code inserted into it.
 	///
 	/// Inputs:
 	///
@@ -217,15 +217,17 @@ impl WrappedFn
 	///
 	/// `function_block`: The new block of code that is replacing the old one inside the function that is being wrapped.
 	///
-	/// Outputs: A `proc_macro2::TokenStream` of the newly wrapped function.
-	fn get_function(mut function: ItemFn, function_block: &TokenStream) -> TokenStream
+	/// Outputs: A `syn::ItemFn` of the newly wrapped function.
+	fn get_wrapped_function(function: &ItemFn, function_block: &TokenStream) -> ItemFn
 	{
 		// Wrap all of this code inside curly braces
 		let function_block = quote!{ { #function_block } };
-		// Set the code inside the function to the new code
-		function.block = syn::parse(function_block.into()).unwrap();
-		// Convert the function back to a TokenStream and return it
-		quote!(#function)
+		// Creates a clone of the function
+		let mut new_function = function.clone();
+		// Put the new code block inside the new function
+		new_function.block = syn::parse(function_block.into()).unwrap();
+		// Return the function with the new code
+		new_function
 	}
 }
 
@@ -269,34 +271,34 @@ impl Parse for WrappedFn
 	}
 }
 
-/// Allows `WrappedFn`s to be converted into `proc_macro2::TokenStream`s for easy use in procedural attribute macros.
-impl From<WrappedFn> for TokenStream
+/// Allows `WrappedFn`s to be converted to `syn::ItemFn`s for easier use in procedural macros.
+impl From<&WrappedFn> for ItemFn
 {
-	/// Converts a `WrappedFn` into a `proc_macro2::TokenStream`.
-	fn from(function: WrappedFn) -> Self
+	/// Converts a `WrappedFn` into a `syn::ItemFn`.
+	fn from(function: &WrappedFn) -> Self
 	{
 		// Determine whether the function has code that gets run before / after the rest of the function or not
-		match (function.pre_code, function.post_code)
+		match (&function.pre_code, &function.post_code)
 		{
 			// If the function has some code to get run both before and after the function
 			(Some(pre_code), Some(post_code)) =>
 			{
 				// Create a new block of code that will replace the old one in the function and start it with the pre code
-				let mut function_block = pre_code;
+				let mut function_block = pre_code.clone();
 				// Wrap and add the original function code and add the post code to the new function block
 				WrappedFn::add_wrapped_post_code(&function.function.block, &function.wrapper_ident, &function.result_ident, &mut function_block, post_code);
-				// Replaces the function's code block with the new one and converts the entire function into a TokenStream to return it
-				WrappedFn::get_function(function.function, &function_block)
+				// Replaces the function's code block with the new one and returns the function
+				WrappedFn::get_wrapped_function(&function.function, &function_block)
 			},
 			// If the function has some code to get run before the function but not after
 			(Some(pre_code), None) =>
 			{
 				// Create a new block of code that will replace the old one in the function and start it with the pre code
-				let mut function_block = pre_code;
+				let mut function_block = pre_code.clone();
 				// Add the function's original code after the pre code
 				WrappedFn::add_unwrapped_code(&mut function_block, &function.function.block);
-				// Replaces the function's code block with the new one and converts the entire function into a TokenStream to return it
-				WrappedFn::get_function(function.function, &function_block)
+				// Replaces the function's code block with the new one and returns the function
+				WrappedFn::get_wrapped_function(&function.function, &function_block)
 			},
 			// If the function has some code to get run after the function but not before
 			(None, Some(post_code)) =>
@@ -305,17 +307,64 @@ impl From<WrappedFn> for TokenStream
 				let mut function_block = TokenStream::new();
 				// Wrap and add the original function code and add the post code to the new function block
 				WrappedFn::add_wrapped_post_code(&function.function.block, &function.wrapper_ident, &function.result_ident, &mut function_block, post_code);
-				// Replaces the function's code block with the new one and converts the entire function into a TokenStream to return it
-				WrappedFn::get_function(function.function, &function_block)
+				// Replaces the function's code block with the new one and returns the function
+				WrappedFn::get_wrapped_function(&function.function, &function_block)
 			},
 			// If the function has no code to insert anywhere
 			(None, None) =>
 			{
-				// Just return the function the way it is as a TokenStream
-				let function = &function.function;
-				quote!(#function)
+				// Just return the function the way it is
+				function.function.clone()
 			}
 		}
+	}
+}
+
+/// Allows `WrappedFn`s to be converted to `syn::ItemFn`s for easier use in procedural macros.
+impl From<WrappedFn> for ItemFn
+{
+	/// Converts a `WrappedFn` into a `syn::ItemFn`.
+	fn from(function: WrappedFn) -> Self
+	{
+		// Use the `From<&WrappedFn> for ItemFn` implementation
+		Self::from(&function)
+	}
+}
+
+/// Allows `WrappedFn`s to be converted into `proc_macro2::TokenStream`s for easier use in procedural attribute macros.
+impl From<&WrappedFn> for TokenStream
+{
+	/// Converts a `WrappedFn` into a `proc_macro2::TokenStream`.
+	fn from(function: &WrappedFn) -> Self
+	{
+		// Convert the function to a `syn::ItemFn` and then convert that into a `TokenStream`
+		let function = ItemFn::from(function);
+		quote!{ #function }
+	}
+}
+
+/// Allows `WrappedFn`s to be converted into `proc_macro2::TokenStream`s for easier use in procedural attribute macros.
+impl From<WrappedFn> for TokenStream
+{
+	/// Converts a `WrappedFn` into a `proc_macro2::TokenStream`.
+	fn from(function: WrappedFn) -> Self
+	{
+		// Convert the function to a `syn::ItemFn` and then convert that into a TokenStream
+		let function = ItemFn::from(function);
+		quote!{ #function }
+	}
+}
+
+/// Allows `WrappedFn`s to be easily appended to and converted to `proc_macro2::TokenStream`s.
+impl ToTokens for WrappedFn
+{
+	/// Adds a `WrappedFn` to the end of a `proc_macro2::TokenStream`.
+	fn to_tokens(&self, tokens: &mut TokenStream)
+	{
+		// Convert the function into a TokenStream
+		let function: TokenStream = self.into();
+		// Add the function to the end of the TokenStream
+		tokens.extend(function);
 	}
 }
 

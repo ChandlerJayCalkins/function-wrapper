@@ -1,6 +1,6 @@
 [package]
 name = "function-wrapper"
-version = "0.1.5"
+version = "0.1.6"
 authors = ["Chandler Calkins <chandlerjaycalkins@gmail.com>"]
 edition = "2021"
 description = "Rust attribute macro library that makes it easy to wrap functions in code that runs before and / or after a function executes."
@@ -8,7 +8,7 @@ readme = "README.md"
 documentation = "https://docs.rs/function-wrapper"
 repository = "https://github.com/ChandlerJayCalkins/function-wrapper"
 license = "MIT OR Apache-2.0"
-keywords = ["wrapper", "attribute", "attributes", "macro", "macros"]
+keywords = ["wrapper", "function", "attribute", "attributes", "macros"]
 categories = ["data-structures", "development-tools", "development-tools::procedural-macro-helpers"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
