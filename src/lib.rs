@@ -367,15 +367,3 @@ impl ToTokens for WrappedFn
 		tokens.extend(function);
 	}
 }
-
-#[cfg(test)]
-mod tests
-{
-	use super::*;
-
-	#[test]
-	fn it_works()
-	{
-		assert(true);
-	}
-}
